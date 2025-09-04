@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Registrar Cita 📅</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <style>
+    body {
+      background-color: #e6f2f7;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .container {
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      padding: 2rem;
+      margin: 2rem auto;
+      max-width: 960px;
+    }
+    h1, h2 {
+      color: #0077b6;
+      text-align: center;
+    }
+    label.form-label {
+      font-weight: 600;
+      color: #023e8a;
+    }
+    .btn-primary {
+      background-color: #0077b6;
+      border-color: #0077b6;
+    }
+    .btn-primary:hover {
+      background-color: #005f73;
+      border-color: #005f73;
+    }
+    .btn-secondary {
+      background-color: #6c757d;
+      border-color: #6c757d;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+  
+    <h1>Hola, <span id="nombrePaciente"></span> 👋</h1>
+    <h2>📅 Solicitar Nueva Cita</h2>
+
+    <form id="form-citas" class="row g-3">
+      
+      <input type="hidden" id="id_paciente" name="id_paciente">
+
+     
+      <div class="col-md-6">
+        <label for="especialidad" class="form-label">Especialidad 🧪</label>
+        <select id="especialidad" class="form-select" required>
+          <option value="">Seleccione una especialidad</option>
+        </select>
+      </div>
+
+    
+      <div class="col-md-6">
+        <label for="medico" class="form-label">Médico 🩺</label>
+        <input type="text" id="medico" name="medico" class="form-control" placeholder="Buscar médico..." autocomplete="off" disabled required>
+      </div>
+
+     
+      <div class="col-12">
+        <label for="motivo" class="form-label">Motivo de la cita 📝</label>
+        <input type="text" id="motivo" name="motivo" class="form-control" placeholder="Ej. Dolor de cabeza" required>
+      </div>
+
+    
+      <div class="col-md-6">
+        <label for="fecha" class="form-label">Fecha 📅</label>
+        <input type="date" id="fecha" name="fecha" class="form-control" disabled required>
+      </div>
+
+     
+      <div class="col-md-6">
+        <label for="hora" class="form-label">Hora ⏰</label>
+        <select id="hora" name="hora" class="form-select" disabled required>
+          <option value="">Seleccione una hora</option>
+        </select>
+      </div>
+
+     
+      <div class="col-12 text-center">
+        <button type="submit" class="btn btn-primary w-50">Guardar Cita 💾</button>
+      </div>
+
+      
+      <div class="col-12 d-flex justify-content-between mt-3">
+        <button type="button" class="btn btn-secondary" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
+        
+      </div>
+    </form>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+  
+  <script>
+    // 1) Cargar datos de paciente desde localStorage
+const usuario = JSON.parse(localStorage.getItem('usuario'));
+console.log(usuario);  
+
+if (!usuario || usuario.rol !== 'paciente') {
+  alert('Acceso no autorizado');
+  window.location.href = 'index.html';
+}
+
+
+document.getElementById('nombrePaciente').textContent = usuario.nombre;
+document.getElementById('id_paciente').value     = usuario.id_usuario;  
+
+
+    // Cargar especialidades
+    $.getJSON('php/obtener_especialidades_citas_administrador.php', datos => {
+      datos.forEach(e => {
+        $('#especialidad').append(`<option value="${e.id_especialidad}">${e.nombre}</option>`);
+      });
+    });
+
+    //Configurar autocomplete de médicos según especialidad
+    function setupAutocompleteMedicos(idEspecialidad) {
+      $('#medico').val('').data('id', '').prop('disabled', false);
+      $('#hora').prop('disabled', true).empty().append('<option>Seleccione una hora</option>');
+      $('#fecha').prop('disabled', true).val('');
+
+      $('#medico').autocomplete({
+        source(request, response) {
+          $.getJSON('php/buscar_medico_citas_admi.php', {
+            tipo: 'medico',
+            q: request.term,
+            especialidad: idEspecialidad
+          }, function(data) {
+            response(data.map(item => ({
+              label: item.nombre,
+              value: item.nombre,
+              id: item.id
+            })));
+          });
+        },
+        minLength: 1,
+        select(event, ui) {
+          $('#medico').data('id', ui.item.id);
+          cargarFechasDisponibles(ui.item.id);
+        }
+      });
+    }
+
+    $('#especialidad').on('change', function() {
+      const idEsp = $(this).val();
+      if (idEsp) setupAutocompleteMedicos(idEsp);
+      else $('#medico').prop('disabled', true).val('');
+    });
+
+    //Cargar fechas disponibles
+    function cargarFechasDisponibles(idMedico) {
+      $.getJSON('php/obtener_fechas_disponibles.php', { id_medico: idMedico }, data => {
+        if (data.length) {
+          $('#fecha').prop('disabled', false)
+                      .attr('min', data[0])
+                      .attr('max', data.at(-1));
+        } else {
+          alert('⚠️ No hay fechas disponibles');
+          $('#fecha').prop('disabled', true).val('');
+        }
+        $('#hora').prop('disabled', true).empty().append('<option>Seleccione una hora</option>');
+      });
+    }
+
+    //Cargar horas disponibles al elegir fecha
+    $('#fecha').on('change', function() {
+      const idMed = $('#medico').data('id'), fec = $(this).val();
+      if (!idMed || !fec) return;
+      $('#hora').prop('disabled', false).empty().append('<option>Cargando…</option>');
+      $.getJSON('php/obtener_horas_admin.php', { id_medico: idMed, fecha: fec }, res => {
+        $('#hora').empty().append('<option value="">Seleccione una hora</option>');
+        if (res.success && res.horas.length) {
+          res.horas.forEach(h => $('#hora').append(`<option value="${h}">${h}</option>`));
+        } else {
+          $('#hora').append('<option disabled>Sin disponibilidad</option>');
+          $('#hora').prop('disabled', true);
+        }
+      });
+    });
+
+    //Envia formulario de cita
+    $('#form-citas').submit(function(e) {
+  e.preventDefault();
+  const payload = {
+    id_paciente: $('#id_paciente').val(),
+    id_medico:   $('#medico').data('id'),
+    fecha_cita:  $('#fecha').val(),
+    hora_cita:   $('#hora').val(),
+    motivo_consulta: $('#motivo').val()
+  };
+  // Aqui llamare al script de paciente
+  $.post('php/guardar_cita_paciente.php', payload, res => {
+    if (res.success) {
+      alert('✅ Cita registrada correctamente.');
+      this.reset();
+      $('#medico, #fecha, #hora').prop('disabled', true);
+      $('#hora').empty().append('<option>Seleccione una hora</option>');
+    } else {
+      alert('❌ ' + (res.error || 'Error al registrar la cita.'));
+    }
+  }, 'json')
+  .fail(() => alert('❌ Error de comunicación con el servidor.'));
+});function cerrarSesion() {
+  localStorage.removeItem('usuario');
+  window.location.href = 'index.html';
+}
+  </script>
+</body>
+</html>
+

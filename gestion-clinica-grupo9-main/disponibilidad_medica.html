@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>📅 Disponibilidad Médica</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #e9f0f7;
+    }
+
+    h2 {
+      color: #007ACC;
+      margin-bottom: 20px;
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+      margin-bottom: 30px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    label {
+      font-weight: bold;
+      margin-bottom: 5px;
+      display: block;
+    }
+
+    select, input[type="time"], input[type="date"], input[type="text"], button {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    button {
+      grid-column: span 2;
+      background: #007ACC;
+      color: #fff;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+      padding: 12px;
+      border: 1px solid #ddd;
+      text-align: left;
+      max-width: 200px;
+      overflow-wrap: break-word;
+    }
+
+    th {
+      background: #007ACC;
+      color: #fff;
+    }
+
+    .acciones {
+      display: flex;
+      gap: 10px;
+    }
+
+    .acciones button {
+      padding: 6px 10px;
+      font-size: 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .editar { background: #ffa500; color: #fff; }
+    .eliminar { background: #e63946; color: #fff; }
+
+    a {
+      text-decoration: none;
+      color: #007ACC;
+      font-weight: bold;
+    }
+
+    #sugerencias {
+      background: #fff;
+      border: 1px solid #ccc;
+      max-height: 120px;
+      overflow-y: auto;
+      position: absolute;
+      z-index: 999;
+      width: 95%;
+    }
+
+    #sugerencias div {
+      padding: 6px;
+      cursor: pointer;
+    }
+
+    #sugerencias div:hover {
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+<body>
+
+  <div style="margin-bottom: 20px;">
+    <a href="principal.html" title="Volver al inicio">🏠 Inicio</a>
+  </div>
+
+  <h2>📅 Disponibilidad Médica</h2>
+
+  <form id="form-disponibilidad">
+    <input type="hidden" id="id_disponibilidad" name="id_disponibilidad" />
+
+    <div>
+      <label>🏥 Especialidad</label>
+      <select id="disp-especialidad" required>
+        <option value="" disabled selected>Seleccione especialidad</option>
+      </select>
+    </div>
+
+    <div style="position: relative;">
+      <label>👨‍⚕️ Buscar Médico</label>
+      <input type="text" id="buscador-medico" placeholder="Buscar por nombre/apellido" autocomplete="off" />
+      <input type="hidden" id="disp-medico" name="medico" />
+      <div id="sugerencias"></div>
+    </div>
+
+    <div>
+      <label>📅 Fecha</label>
+      <input type="date" id="disp-fecha" name="fecha" required />
+    </div>
+
+    <div>
+      <label>🕒 Hora Inicio</label>
+      <input type="time" id="disp-hora-inicio" name="hora_inicio" required />
+    </div>
+
+    <div>
+      <label>🕔 Hora Fin</label>
+      <input type="time" id="disp-hora-fin" name="hora_fin" required />
+    </div>
+
+    <button type="submit">💾 Guardar Disponibilidad</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Médico</th>
+        <th>Fecha</th>
+        <th>Hora Inicio</th>
+        <th>Hora Fin</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tabla-disponibilidad"></tbody>
+  </table>
+
+  <script>
+    const form = document.getElementById("form-disponibilidad");
+    const tabla = document.getElementById("tabla-disponibilidad");
+    const selectEspecialidad = document.getElementById("disp-especialidad");
+    const inputBuscador = document.getElementById("buscador-medico");
+    const inputMedicoId = document.getElementById("disp-medico");
+    const sugerencias = document.getElementById("sugerencias");
+    const inputFecha = document.getElementById("disp-fecha");
+
+    let medicos = [];
+
+    function cargarEspecialidades() {
+      fetch("php/obtener_especialidades.php")
+        .then(res => res.json())
+        .then(data => {
+          data.forEach(esp => {
+            const opt = document.createElement("option");
+            opt.value = esp.id_especialidad;
+            opt.textContent = esp.nombre;
+            selectEspecialidad.appendChild(opt);
+          });
+        });
+    }
+
+    function cargarMedicos() {
+      fetch("php/disponibilidad_api.php?medicos")
+        .then(res => res.json())
+        .then(data => { medicos = data; });
+    }
+
+    inputBuscador.addEventListener("input", () => {
+      const texto = inputBuscador.value.toLowerCase();
+      const especialidad = selectEspecialidad.value;
+      sugerencias.innerHTML = "";
+
+      const filtrados = medicos.filter(m => {
+        const nombreCompleto = (m.nombres + " " + m.apellidos).toLowerCase();
+        return nombreCompleto.includes(texto) && (!especialidad || m.id_especialidad == especialidad);
+      });
+
+      filtrados.forEach(m => {
+        const div = document.createElement("div");
+        div.textContent = m.nombres + " " + m.apellidos;
+        div.addEventListener("click", () => {
+          inputMedicoId.value = m.id_medico;
+          inputBuscador.value = m.nombres + " " + m.apellidos;
+          sugerencias.innerHTML = "";
+        });
+        sugerencias.appendChild(div);
+      });
+    });
+
+    function cargarDisponibilidad() {
+      fetch("php/disponibilidad_api.php?listar")
+        .then(res => res.json())
+        .then(data => {
+          tabla.innerHTML = "";
+          data.forEach(d => {
+            const fila = `
+              <tr>
+                <td>${d.medico}</td>
+                <td>${d.fecha}</td>
+                <td>${d.hora_inicio}</td>
+                <td>${d.hora_fin}</td>
+                <td class="acciones">
+                  <button class="editar" onclick='editar(${JSON.stringify(d)})'>✏️</button>
+                  <button class="eliminar" onclick='eliminar(${d.id_disponibilidad})'>🗑️</button>
+                </td>
+              </tr>
+            `;
+            tabla.insertAdjacentHTML("beforeend", fila);
+          });
+        });
+    }
+
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      const datos = new FormData(form);
+      fetch("php/disponibilidad_api.php", {
+        method: "POST",
+        body: datos
+      })
+      .then(res => res.json())
+      .then(() => {
+        form.reset();
+        cargarDisponibilidad();
+        form.querySelector("#id_disponibilidad").value = "";
+      });
+    });
+
+    function editar(d) {
+      document.getElementById("id_disponibilidad").value = d.id_disponibilidad;
+      inputMedicoId.value = d.id_medico;
+      inputBuscador.value = d.medico;
+      inputFecha.value = d.fecha;
+      document.getElementById("disp-hora-inicio").value = d.hora_inicio;
+      document.getElementById("disp-hora-fin").value = d.hora_fin;
+      window.scrollTo(0, 0);
+    }
+
+    function eliminar(id) {
+      if (!confirm("¿Eliminar esta disponibilidad?")) return;
+      fetch("php/disponibilidad_api.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eliminar: true, id_disponibilidad: id })
+      })
+      .then(res => res.json())
+      .then(() => cargarDisponibilidad());
+    }
+
+    cargarEspecialidades();
+    cargarMedicos();
+    cargarDisponibilidad();
+  </script>
+</body>
+</html>
+
+
+

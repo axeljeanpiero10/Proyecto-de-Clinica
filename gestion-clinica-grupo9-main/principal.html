@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🏥 Panel Principal</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:Arial,sans-serif }
+    body { background:linear-gradient(135deg,#0077b6,#00b4d8); min-height:100vh; display:flex; align-items:center; justify-content:center; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1.5rem; width:90%; max-width:800px; }
+    .card { background:rgba(255,255,255,0.9); border-radius:12px; padding:2rem; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2); transition:transform .2s; }
+    .card:hover { transform:translateY(-5px); }
+    .card a { text-decoration:none; color:#03045e; font-size:1.2rem; display:block; margin-top:1rem; }
+  </style>
+</head>
+<body>
+  <div class="grid">
+    
+    <div class="card">
+      <div style="font-size:3rem;">🏥</div>
+      <a href="especialidades.html">Módulo Especialidades</a>
+    </div>
+    <div class="card">
+      <div style="font-size:3rem;">👥</div>
+      <a href="pacientes.html">Módulo Pacientes</a>
+    </div>
+    <div class="card">
+      <div style="font-size:3rem;">📅</div>
+      <a href="citas.html">Módulo Citas</a>
+    </div>
+    <div class="card">
+        <div style="font-size:3rem;">📋</div>
+        <a href="Historia_Clinica.html">Historias Clinicas</a>
+      </div>
+      <div class="card">
+        <div style="font-size:3rem;">🩺</div>
+        <a href="disponibilidad_medica.html">Disponibilidad Médica</a>
+      </div>
+      <div class="card">
+        <div style="font-size:3rem;">📝</div>
+        <a href="reportes_detallados.html">Reportes</a>
+      </div>
+      <div class="card">
+        <div style="font-size:3rem;">⚙️</div>
+        <a href="configuraciones.html">Configuraciones</a>
+      </div>
+      <div class="card">
+        <div style="font-size:3rem;">🚪</div>
+        <a href="#" id="btnLogout">Cerrar Sesión</a>
+      </div>
+      
+      <script>
+        document.getElementById('btnLogout').addEventListener('click', function(e) {
+          e.preventDefault();
+          localStorage.removeItem('usuario');
+          window.location.href = 'index.html';
+        });
+      </script>
+  </div>
+</body>
+</html>
