@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>⚙️ Configuraciones</title>
+ 
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f2f6fb;
+      padding: 20px;
+    }
+
+    h2 {
+      color: #007acc;
+      margin-bottom: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+    }
+
+    th {
+      background-color: #007acc;
+      color: white;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      border: 1px solid #ccc;
+      padding: 8px;
+      border-radius: 6px;
+    }
+
+    button {
+      background-color: #007acc;
+      color: white;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #005e99;
+    }
+
+    .inicio {
+      margin-bottom: 20px;
+    }
+
+    .inicio a {
+      text-decoration: none;
+      color: #007acc;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="inicio">
+    <a href="principal.html">🏠 Inicio</a>
+  </div>
+
+  <h2>⚙️ Configuraciones del Sistema</h2>
+
+  <form id="config-form">
+    <table>
+      <thead>
+        <tr>
+          <th>Clave</th>
+          <th>Valor</th>
+        </tr>
+      </thead>
+      <tbody id="config-table">
+        
+      </tbody>
+    </table>
+    <button type="submit">Guardar Cambios</button>
+  </form>
+
+  <script>
+    const tabla = document.getElementById("config-table");
+    const form = document.getElementById("config-form");
+
+    function cargarConfiguraciones() {
+      fetch("php/configuraciones.php?listar")
+        .then(res => res.json())
+        .then(data => {
+          tabla.innerHTML = "";
+          data.forEach(item => {
+            const fila = `
+              <tr>
+                <td><strong>${item.clave}</strong></td>
+                <td>
+                  <input type="text" name="${item.clave}" value="${item.valor}">
+                </td>
+              </tr>`;
+            tabla.insertAdjacentHTML("beforeend", fila);
+          });
+        });
+    }
+
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      const datos = new FormData(form);
+      fetch("php/configuraciones.php", {
+        method: "POST",
+        body: datos
+      })
+      .then(res => res.text())
+      .then(res => {
+        alert("Configuraciones actualizadas correctamente.");
+        cargarConfiguraciones();
+      });
+    });
+
+    cargarConfiguraciones();
+  </script>
+
+</body>
+</html>

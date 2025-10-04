@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Historia Clínica Digital📋</title>
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <style>
+    
+    :root { --azul-essalud:#0077b6; --turquesa:#00b4d8; --fondo:#f0faff;}
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui;}
+    body{background:linear-gradient(135deg,var(--azul-essalud),var(--turquesa));min-height:100vh;padding:2rem;display:grid;place-items:center;}
+    .contenedor-principal{background:rgba(255,255,255,0.98);border-radius:25px;box-shadow:0 10px 30px rgba(0,0,0,0.15);width:100%;max-width:1200px;min-height:80vh;padding:2.5rem;display:flex;flex-direction:column;gap:1.5rem;}
+    .cabecera{display:flex;justify-content:space-between;align-items:center;padding-bottom:1.5rem;border-bottom:3px solid var(--turquesa);}
+    .titulo-principal{color:var(--azul-essalud);font-size:2.4rem;display:flex;align-items:center;gap:1rem;}
+    .search-section{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;}
+    .search-input,.date-input{padding:0.8rem;border:2px solid var(--turquesa);border-radius:8px;}
+    .btn{padding:0.8rem 1.5rem;background:var(--azul-essalud);color:white;border:none;border-radius:8px;cursor:pointer;transition:background 0.3s ease;text-decoration:none;display:inline-block;}
+    .btn:hover{background:#03045e;}
+    .tarjeta-paciente,.linea-tiempo{margin-top:1rem;}
+    .tarjeta-paciente{background:var(--fondo);border-radius:20px;padding:2rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem;}
+    .etiqueta{font-weight:600;margin-bottom:0.5rem;display:block;color:#1d3557;}
+    .valor-celda{background:white;border-radius:10px;padding:0.8rem;}
+    .linea-tiempo{position:relative;padding:2rem 0;}
+    .evento{position:relative;background:white;border-radius:15px;box-shadow:0 3px 10px rgba(0,0,0,0.08);padding:1.5rem;margin-bottom:2rem;}
+    .evento:before{content:'';position:absolute;left:-1.5rem;top:50%;transform:translateY(-50%);width:12px;height:12px;background:var(--turquesa);border-radius:50%;}
+    .acciones-evento{margin-top:1rem;display:flex;gap:0.5rem;}
+  </style>
+</head>
+<body>
+  <div class="contenedor-principal">
+    <header class="cabecera">
+      <a href="principal.html" class="btn">🏠 Inicio</a>
+      <h1 class="titulo-principal">🏥 Historia Clínica Digital</h1>
+      <div>Fecha: <span id="fecha-actualizacion"></span></div>
+    </header>
+
+    <div class="search-section">
+      <input type="text" id="buscarPaciente" class="search-input" placeholder="Buscar por nombre o apellido...">
+      <label>Desde: <input type="date" id="filtroDesde" class="date-input"></label>
+      <label>Hasta: <input type="date" id="filtroHasta" class="date-input"></label>
+      <button class="btn" onclick="aplicarFiltroFechas()">📅 Filtrar</button>
+    </div>
+
+    <div id="tarjetaPaciente" class="tarjeta-paciente" style="display:none;"></div>
+    <div id="lineaTiempo" class="linea-tiempo"></div>
+  </div>
+
+  
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script>
+  
+  let historias = [], paginaActual = 1, porPagina = 3, pacienteSeleccionado = null;
+  document.getElementById("fecha-actualizacion").textContent = new Date().toLocaleDateString();
+
+  $(function(){
+    $("#buscarPaciente").autocomplete({
+      source(request, response) {
+        $.getJSON("php/buscar_paciente_autocompletar_historiaC.php", { q: request.term }, data => {
+          response(data.map(p => ({
+            label: `${p.nombres} ${p.apellidos}`,
+            value: `${p.nombres} ${p.apellidos}`,
+            id: p.id_paciente
+          })));
+        });
+      },
+      select(evt, ui){
+        pacienteSeleccionado = ui.item.id;
+        cargarHistoria(ui.item.id);
+      }
+    });
+  });
+
+  async function cargarHistoria(id_paciente){
+    let url = `php/buscar_paciente_historiaclinica.php?id_paciente=${id_paciente}`;
+    const desde = document.getElementById("filtroDesde").value;
+    const hasta = document.getElementById("filtroHasta").value;
+    if(desde && hasta) url += `&desde=${desde}&hasta=${hasta}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data.success) return alert("No se encontraron historias.");
+    mostrarDatosPaciente(data.paciente);
+    historias = data.historias || [];
+    paginaActual = 1;
+    mostrarPaginadas();
+  }
+
+  function mostrarDatosPaciente(p){
+    const t = document.getElementById("tarjetaPaciente");
+    t.style.display="grid";
+    t.innerHTML = `
+      <div><span class="etiqueta">👤 Nombres:</span><div class="valor-celda">${p.nombres} ${p.apellidos}</div></div>
+      <div><span class="etiqueta">📧 Correo:</span><div class="valor-celda">${p.correo||"-"}</div></div>
+      <div><span class="etiqueta">📞 Teléfono:</span><div class="valor-celda">${p.telefono||"-"}</div></div>
+      <div><span class="etiqueta">📅 Nac.:</span><div class="valor-celda">${p.fecha_nacimiento}</div></div>
+      <div><span class="etiqueta">🏠 Dir.:</span><div class="valor-celda">${p.direccion||"-"}</div></div>
+    `;
+  }
+
+  function mostrarPaginadas(){
+    const inicio=(paginaActual-1)*porPagina;
+    const arr=historias.slice(inicio, inicio+porPagina);
+    const cont=document.getElementById("lineaTiempo");
+    cont.innerHTML="";
+    if(arr.length===0){
+      cont.innerHTML="<p>No hay historias para este rango.</p>";return;
+    }
+    arr.forEach(h=>{
+      const div=document.createElement("div");
+      div.className="evento";
+      let btns=`<button class="btn" onclick='generarPDF(${JSON.stringify(h)})'>📄 PDF</button>`;
+      if(h.estado!=="atendida"){
+        btns+=` <button class="btn" onclick='mostrarFormularioEdicion(${JSON.stringify(h)})'>✏️ Editar Historia Clínica</button>`;
+      }
+      div.innerHTML=`
+        <p><strong>📅 Fecha:</strong> ${h.fecha_cita || h.fecha_registro}</p>
+        <p><strong>🩺 Médico:</strong> ${h.nombre_medico}</p>
+        <p><strong>📝 Motivo:</strong> ${h.motivo_consulta}</p>
+        <p><strong>📋 Diagnóstico:</strong> ${h.diagnostico||"-"}</p>
+        <p><strong>💊 Tratamiento:</strong> ${h.tratamiento||"-"}</p>
+        <p><strong>🔄 Estado:</strong> ${h.estado}</p>
+        <div class="acciones-evento">${btns}</div>
+      `;
+      cont.appendChild(div);
+    });
+    const total=Math.ceil(historias.length/porPagina);
+    const nav=document.createElement("div");
+    nav.style.marginTop="1rem";
+    nav.innerHTML=`
+      <button class="btn" ${paginaActual<=1?"disabled":""} onclick="cambiarPagina(-1)">⬅ Anterior</button>
+      Página ${paginaActual} de ${total}
+      <button class="btn" ${paginaActual>=total?"disabled":""} onclick="cambiarPagina(1)">Siguiente ➡</button>
+    `;
+    cont.appendChild(nav);
+  }
+
+  function cambiarPagina(d){ paginaActual+=d; mostrarPaginadas(); }
+
+  function generarPDF(h){
+    const { jsPDF }=window.jspdf, doc=new jsPDF();
+    doc.setFontSize(16).text("🩺 Historia Clínica Digital",10,15)
+       .setFontSize(12)
+       .text(`📅 ${h.fecha_registro}`,10,30)
+       .text(`👨‍⚕️ ${h.nombre_medico}`,10,40)
+       .text(`📝 ${h.motivo_consulta||"-"}`,10,50,{maxWidth:170})
+       .text(`📋 ${h.diagnostico||"-"}`,10,70,{maxWidth:170})
+       .text(`💊 ${h.tratamiento||"-"}`,10,90,{maxWidth:170})
+       .save(`historia_${h.id_historia}.pdf`);
+  }
+
+  function aplicarFiltroFechas(){
+    if(pacienteSeleccionado) cargarHistoria(pacienteSeleccionado);
+    else alert("Selecciona un paciente primero");
+  }
+
+  function mostrarFormularioEdicion(h){
+    const modal=document.createElement("div");
+    modal.id="modalEditar";
+    modal.style=`position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;`;
+    modal.innerHTML=`
+      <div style="background:#fff;padding:2rem;border-radius:15px;max-width:500px;width:100%;">
+        <h3>✏️ Editar Historia Clínica</h3>
+        <label>Motivo:<br><textarea id="editMotivo" style="width:100%;height:4rem;">${h.motivo_consulta}</textarea></label><br><br>
+        <label>Diagnóstico:<br><textarea id="editDiagnostico" style="width:100%;height:4rem;">${h.diagnostico||""}</textarea></label><br><br>
+        <label>Tratamiento:<br><textarea id="editTratamiento" style="width:100%;height:4rem;">${h.tratamiento||""}</textarea></label><br><br>
+        <label style="display:flex;align-items:center;gap:0.5rem;">
+          <input type="checkbox" id="editAtendida" ${h.estado==="atendida"?"checked disabled":""}/>
+          <span>Marcar como atendida</span>
+        </label><br><br>
+        <div style="text-align:right;">
+          <button class="btn" onclick="guardarEdicion(${h.id_historia},${h.id_cita})">💾 Guardar</button>
+          <button class="btn" onclick="cerrarModal()">❌ Cancelar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+
+  function cerrarModal(){
+    const m=document.getElementById("modalEditar");
+    if(m) m.remove();
+  }
+
+  async function guardarEdicion(id_historia,id_cita){
+    const motivo=document.getElementById("editMotivo").value.trim();
+    const diagnostico=document.getElementById("editDiagnostico").value.trim();
+    const tratamiento=document.getElementById("editTratamiento").value.trim();
+    const marcarAtend=document.getElementById("editAtendida")?.checked;
+
+    let r=await fetch("php/editar_historia.php",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id_historia,motivo,diagnostico,tratamiento})});
+    let j=await r.json();
+    if(!j.success) return alert("❌ Error: "+j.error);
+
+    if(marcarAtend){
+      r=await fetch("php/marcar_cita_atendida.php",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:`id_cita=${id_cita}`});
+      j=await r.json();
+      if(!j.success) return alert("⚠️ Historia ok, pero no marcó cita: "+j.error);
+    }
+
+    cerrarModal();
+    alert("✅ Historia actualizada"+(marcarAtend?" y cita atendida":""));
+    cargarHistoria(pacienteSeleccionado);
+  }
+  
+  </script>
+</body>
+</html>

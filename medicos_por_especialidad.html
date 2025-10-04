@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>👨‍⚕️ Médicos por Especialidad</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f8ff;
+      padding: 2rem;
+    }
+    h1 { color: #0077b6; margin-bottom: 1rem; }
+    .acciones {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    input, button {
+      padding: 10px;
+      margin-right: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    input {
+      width: 300px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      padding: 12px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+    th {
+      background-color: #0077b6;
+      color: white;
+    }
+    .btn-danger { background: #f44336; color: white; }
+    .btn-edit { background: #ffa500; color: white; }
+    .btn-add { background: #4caf50; color: white; }
+  </style>
+</head>
+<body>
+  <h1>👨‍⚕️ Médicos <span id="nombreEspecialidad"></span></h1>
+
+  <div class="acciones">
+    <div>
+      <button onclick="window.location.href='especialidades.html'">⬅️ Volver a Especialidades</button>
+      <button class="btn-add" onclick="mostrarFormulario()">➕ Agregar Médico</button>
+    </div>
+    <input type="text" id="buscar" placeholder="🔍 Buscar por nombre o apellido">
+  </div>
+
+  <form id="formulario" style="display:none; margin-bottom:1rem;">
+    <input type="hidden" id="id_medico" name="id_medico">
+    <input type="text" id="nombres" name="nombres" placeholder="Nombres" required>
+    <input type="text" id="apellidos" name="apellidos" placeholder="Apellidos" required>
+    <input type="text" id="cmp" name="cmp" placeholder="CMP" required>
+    <input type="text" id="telefono" name="telefono" placeholder="Teléfono" required>
+    <input type="email" id="correo" name="correo" placeholder="Correo" required>
+    <input type="text" id="direccion" name="direccion" placeholder="Dirección" required>
+    <button type="submit">💾 Guardar</button>
+    <button type="button" onclick="cancelarFormulario()">❌ Cancelar</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>CMP</th>
+        <th>Teléfono</th>
+        <th>Correo</th>
+        <th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tablaMedicos"></tbody>
+  </table>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const id_especialidad = params.get("id_especialidad");
+
+    if (!id_especialidad) {
+      alert("No se proporcionó una especialidad.");
+      window.location.href = "especialidades.html";
+    }
+
+    const buscar = document.getElementById("buscar");
+    const tabla = document.getElementById("tablaMedicos");
+    const formulario = document.getElementById("formulario");
+    const campos = ["id_medico", "nombres", "apellidos", "cmp", "telefono", "correo", "direccion"];
+
+
+    async function cargarMedicos(busqueda = "") {
+      const res = await fetch(`php/obtener_medicos_por_especialidad.php?id_especialidad=${id_especialidad}&busqueda=${encodeURIComponent(busqueda)}`);
+      const medicos = await res.json();
+
+      tabla.innerHTML = medicos.length === 0 ?
+        "<tr><td colspan='5'>No hay médicos para esta especialidad</td></tr>" :
+        medicos.map(m => `
+          <tr>
+            <td>${m.nombres} ${m.apellidos}</td>
+            <td>${m.cmp}</td>
+            <td>${m.telefono}</td>
+            <td>${m.correo}</td>
+            <td>
+              <button class="btn-edit" onclick='editarMedico(${JSON.stringify(m)})'>✏️</button>
+              <button class="btn-danger" onclick='eliminarMedico(${m.id_medico})'>🗑️</button>
+            </td>
+          </tr>`).join("");
+    }
+
+    async function eliminarMedico(id) {
+      if (!confirm("¿Eliminar este médico?")) return;
+      const res = await fetch("php/eliminar_medico.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_medico: id })
+      });
+      const result = await res.json();
+      if (result.success) cargarMedicos(buscar.value);
+      else alert("Error: " + result.error);
+    }
+
+    function mostrarFormulario() {
+      formulario.style.display = "block";
+      campos.forEach(id => document.getElementById(id).value = "");
+    }
+
+    function cancelarFormulario() {
+      formulario.reset();
+      formulario.style.display = "none";
+    }
+
+    function editarMedico(medico) {
+      formulario.style.display = "block";
+      campos.forEach(id => document.getElementById(id).value = medico[id] || "");
+    }
+
+    formulario.addEventListener("submit", async e => {
+    e.preventDefault();
+    const formData = new FormData(formulario);
+    formData.append("id_especialidad", id_especialidad);
+
+    const res = await fetch("php/guardar_medico.php", {
+      method: "POST",
+      body: formData
+    });
+
+    const result = await res.json();
+
+    if (result.success) {
+      alert(result.message);
+      cargarMedicos(buscar.value);
+      cancelarFormulario();
+    } else {
+      alert("Error: " + result.error);
+    }
+  });
+
+    buscar.addEventListener("input", () => cargarMedicos(buscar.value));
+    const nombre_especialidad = params.get("nombre_especialidad") || `#${id_especialidad}`;
+document.getElementById("nombreEspecialidad").textContent = `de ${decodeURIComponent(nombre_especialidad)}`;
+
+    cargarMedicos();
+  </script>
+</body>
+</html>

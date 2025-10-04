@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>📊 Reportes Detallados</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #eaf6fc; }
+    .container { max-width: 960px; margin: 2rem auto; background: white; padding: 2rem; border-radius: 8px; }
+    h1, h2 { color: #007ACC; }
+    .filtros { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .filtros input { width: 150px; }
+    .grupo { margin-top: 2rem; }
+    .grupo h3 { background: #007ACC; color: white; padding: 0.5rem; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: .5rem; }
+    th, td { border: 1px solid #ddd; padding: .5rem; }
+    th { background: #007ACC; color: white; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1>📊 Reportes por Especialidad</h1>
+      <a href="principal.html" class="btn btn-secondary">🏠 Inicio</a>
+    </div>
+
+    <div class="filtros">
+      <label>Desde: <input type="date" id="desde"></label>
+      <label>Hasta: <input type="date" id="hasta"></label>
+      <button class="btn btn-primary" onclick="generarReporte()">Generar Reporte</button>
+      <button class="btn btn-success" onclick="exportarPDF()">Exportar a PDF</button>
+    </div>
+
+    <div id="reporte"></div>
+  </div>
+
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+  <script>
+    let datosReporte = null;
+
+    async function generarReporte() {
+      const desde = document.getElementById('desde').value;
+      const hasta = document.getElementById('hasta').value;
+      if (!desde || !hasta) return alert('Selecciona ambas fechas');
+      const res = await fetch(`php/reportes_detallados.php?desde=${desde}&hasta=${hasta}`);
+      const json = await res.json();
+      if (!json.success) return alert(json.error);
+      datosReporte = json.grupos;
+      renderizar(json.grupos, desde, hasta);
+    }
+
+    function renderizar(grupos, desde, hasta) {
+      const cont = document.getElementById('reporte');
+      cont.innerHTML = `<h2>Reporte del ${desde} al ${hasta}</h2>`;
+      grupos.forEach(g => {
+        let html = `<div class="grupo"><h3>${g.especialidad} (${g.citas.length} citas)</h3>`;
+        html += `<table><thead><tr>
+                   <th>Paciente</th><th>Médico</th><th>Fecha</th><th>Hora</th><th>Motivo</th>
+                 </tr></thead><tbody>`;
+        g.citas.forEach(c => {
+          html += `<tr>
+                     <td>${c.paciente}</td>
+                     <td>${c.medico}</td>
+                     <td>${c.fecha}</td>
+                     <td>${c.hora}</td>
+                     <td>${c.motivo}</td>
+                   </tr>`;
+        });
+        html += `</tbody></table></div>`;
+        cont.innerHTML += html;
+      });
+    }
+
+    function exportarPDF() {
+  if (!datosReporte) return alert('Genera el reporte primero');
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const desde = document.getElementById('desde').value;
+  const hasta = document.getElementById('hasta').value;
+
+  const logo = new Image();
+  logo.src = 'img/logo.png'; 
+
+  logo.onload = function () {
+    
+    doc.addImage(logo, 'PNG', 15, 10, 30, 30); 
+
+    // Encabezado centrado
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Reporte por Especialidad", 105, 20, null, null, "center");
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.text("Clínica Grupo 9", 105, 30, null, null, "center");
+    doc.text(`Período: ${desde} al ${hasta}`, 105, 38, null, null, "center");
+
+    let y = 50;
+
+    datosReporte.forEach(grupo => {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.text(`Especialidad: ${grupo.especialidad} (${grupo.citas.length} citas)`, 20, y);
+      y += 10;
+
+      const rows = grupo.citas.map(cita => [
+        cita.paciente,
+        cita.medico,
+        cita.fecha,
+        cita.hora,
+        cita.motivo
+      ]);
+
+      doc.autoTable({
+        startY: y + 5,
+        head: [['Paciente', 'Médico', 'Fecha', 'Hora', 'Motivo']],
+        body: rows,
+        styles: { fontSize: 9 },
+        theme: 'grid',
+        headStyles: { fillColor: [0, 123, 204] }
+      });
+
+      y = doc.lastAutoTable.finalY + 20;
+    });
+
+    doc.save(`reporte_${desde}_a_${hasta}.pdf`);
+  };
+}
+
+  </script>
+</body>
+</html>
